@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package instautoctrl contains the controller for Instance Termination and Submission automations.
-package instautoctrl
+package instinactivectrl
 
 import (
 	"context"
@@ -35,8 +35,8 @@ import (
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/utils"
 )
 
-// InstanceSubmissionReconciler watches for instances to be terminated.
-type InstanceSubmissionReconciler struct {
+// InstanceInactiveSubmissionReconciler watches for instances to be terminated.
+type InstanceInactiveSubmissionReconciler struct {
 	client.Client
 	EventsRecorder     record.EventRecorder
 	Scheme             *runtime.Scheme
@@ -49,20 +49,20 @@ type InstanceSubmissionReconciler struct {
 }
 
 // SetupWithManager registers a new controller for InstanceSubmissionReconciler resources.
-func (r *InstanceSubmissionReconciler) SetupWithManager(mgr ctrl.Manager, concurrency int) error {
+func (r *InstanceInactiveSubmissionReconciler) SetupWithManager(mgr ctrl.Manager, concurrency int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&clv1alpha2.Instance{}).
 		Owns(&batch.Job{}).
-		Named("instance-submission").
+		Named("instance-inactive-submission").
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: concurrency,
 		}).
-		WithLogConstructor(utils.LogConstructor(mgr.GetLogger(), "InstanceSubmission")).
+		WithLogConstructor(utils.LogConstructor(mgr.GetLogger(), "InstanceInactiveSubmission")).
 		Complete(r)
 }
 
 // Reconcile reconciles the status of the InstanceSnapshot resource.
-func (r *InstanceSubmissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *InstanceInactiveSubmissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if r.ReconcileDeferHook != nil {
 		defer r.ReconcileDeferHook()
 	}
@@ -139,7 +139,7 @@ func (r *InstanceSubmissionReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 // EnforceInstanceSubmissionJob ensures that the submission job for the given instance is present.
-func (r *InstanceSubmissionReconciler) EnforceInstanceSubmissionJob(ctx context.Context, instance *clv1alpha2.Instance, environment *clv1alpha2.Environment) (jobStatus *batch.JobStatus, err error) {
+func (r *InstanceInactiveSubmissionReconciler) EnforceInstanceSubmissionJob(ctx context.Context, instance *clv1alpha2.Instance, environment *clv1alpha2.Environment) (jobStatus *batch.JobStatus, err error) {
 	// Get the submission job.
 	submitterName := "submitter"
 	job := batch.Job{ObjectMeta: forge.ObjectMetaWithSuffix(instance, submitterName)}
@@ -162,7 +162,7 @@ func (r *InstanceSubmissionReconciler) EnforceInstanceSubmissionJob(ctx context.
 }
 
 // CheckLabelSelectors checks whether the given instance is eligible for reconciliation.
-func (r *InstanceSubmissionReconciler) CheckLabelSelectors(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
+func (r *InstanceInactiveSubmissionReconciler) CheckLabelSelectors(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("selectors-check")
 
 	if !utils.CheckSingleLabel(instance, forge.InstanceSubmissionSelectorLabel, strconv.FormatBool(true)) {
