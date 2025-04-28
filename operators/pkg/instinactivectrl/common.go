@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package instautoctrl contains the controller for Instance Termination and Submission automations.
+// Package instautoctrl contains the controller for Instance Inactive Termination
 package instinactivectrl
 
 import (
@@ -48,17 +48,4 @@ func RetrieveEnvironment(ctx context.Context, c client.Client, instance *clv1alp
 	}
 
 	return &template.Spec.EnvironmentList[0], nil
-}
-
-// CheckEnvironmentValidity checks whether the given environment is valid and returns it (there must be one environment that must be persistent and contestDestination within instance spec customization urls must be present).
-func CheckEnvironmentValidity(instance *clv1alpha2.Instance, environment *clv1alpha2.Environment) error {
-	if instance.Spec.CustomizationUrls == nil || instance.Spec.CustomizationUrls.ContentDestination == "" {
-		return fmt.Errorf("missing content-destination field for instance")
-	}
-
-	if !environment.Persistent {
-		return fmt.Errorf("persistent environment required for submission job")
-	}
-
-	return nil
 }

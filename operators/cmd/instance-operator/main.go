@@ -83,7 +83,6 @@ func main() {
 	maxInactiveConcurrentTerminationReconciles := flag.Int("max-inactive-concurrent-reconciles-termination", 1, "The maximum number of concurrent Reconciles which can be run for the Instance Termination controller")
 	instanceInactiveTerminationStatusCheckTimeout := flag.Duration("instance-inactive-termination-status-check-timeout", 3*time.Second, "The maximum time to wait for the status check for Instances that require it")
 	instanceInactiveTerminationStatusCheckInterval := flag.Duration("instance-inactive-termination-status-check-interval", 2*time.Minute, "The interval to check the status of Instances that require it")
-	maxInactiveConcurrentSubmissionReconciles := flag.Int("max-inactive-concurrent-reconciles-submission", 1, "The maximum number of concurrent Reconciles which can be run for the Instance Submission controller")
 
 	flag.StringVar(&svcUrls.WebsiteBaseURL, "website-base-url", "crownlabs.polito.it", "Base URL of crownlabs website instance")
 	flag.StringVar(&svcUrls.InstancesAuthURL, "instances-auth-url", "", "The base URL for user instances authentication (i.e., oauth2-proxy)")
@@ -193,19 +192,6 @@ func main() {
 		InstanceStatusCheckInterval: *instanceInactiveTerminationStatusCheckInterval,
 	}).SetupWithManager(mgr, *maxInactiveConcurrentTerminationReconciles); err != nil {
 		log.Error(err, "unable to create controller", "controller", instanceInactiveTermination)
-		os.Exit(1)
-	}
-
-	// Configure the Instance Inactive submission controller
-	instanceInactiveSubmission := "InstanceInactiveSubmission"
-	if err := (&instinactivectrl.InstanceInactiveSubmissionReconciler{
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		EventsRecorder:     mgr.GetEventRecorderFor(instanceInactiveSubmission),
-		ContainerEnvOpts:   containerEnvOpts,
-		NamespaceWhitelist: nsWhitelist,
-	}).SetupWithManager(mgr, *maxInactiveConcurrentSubmissionReconciles); err != nil {
-		log.Error(err, "unable to create controller", "controller", instanceInactiveSubmission)
 		os.Exit(1)
 	}
 
