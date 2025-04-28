@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package instautoctrl contains the controller for Instance Termination and Submission automations.
-package instautoctrl
+package instinactivectrl
 
 import "time"
 

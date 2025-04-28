@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package instautoctrl contains the controller for Instance Termination and Submission automations.
-package instautoctrl
+package instinactivectrl
 
 import (
 	"context"
@@ -37,8 +37,8 @@ import (
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/utils"
 )
 
-// InstanceTerminationReconciler watches for instances to be terminated.
-type InstanceTerminationReconciler struct {
+// InstanceInactiveTerminationReconciler watches for instances to be terminated.
+type InstanceInactiveTerminationReconciler struct {
 	client.Client
 	EventsRecorder              record.EventRecorder
 	Scheme                      *runtime.Scheme
@@ -52,19 +52,19 @@ type InstanceTerminationReconciler struct {
 }
 
 // SetupWithManager registers a new controller for InstanceTerminationReconciler resources.
-func (r *InstanceTerminationReconciler) SetupWithManager(mgr ctrl.Manager, concurrency int) error {
+func (r *InstanceInactiveTerminationReconciler) SetupWithManager(mgr ctrl.Manager, concurrency int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&clv1alpha2.Instance{}).
-		Named("instance-termination").
+		Named("instance-inactive-termination").
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: concurrency,
 		}).
-		WithLogConstructor(utils.LogConstructor(mgr.GetLogger(), "InstanceTermination")).
+		WithLogConstructor(utils.LogConstructor(mgr.GetLogger(), "InstanceInactiveTermination")).
 		Complete(r)
 }
 
 // Reconcile reconciles the status of the InstanceSnapshot resource.
-func (r *InstanceTerminationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if r.ReconcileDeferHook != nil {
 		defer r.ReconcileDeferHook()
 	}
@@ -133,7 +133,7 @@ func (r *InstanceTerminationReconciler) Reconcile(ctx context.Context, req ctrl.
 }
 
 // CheckInstanceTermination checks if the Instance has to be terminated.
-func (r *InstanceTerminationReconciler) CheckInstanceTermination(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
+func (r *InstanceInactiveTerminationReconciler) CheckInstanceTermination(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
 	if instance.Spec.CustomizationUrls == nil {
 		return false, errors.New("customization urls field is not set for Instance")
 	}
@@ -177,7 +177,7 @@ func (r *InstanceTerminationReconciler) CheckInstanceTermination(ctx context.Con
 }
 
 // TerminateInstance terminates the Instance.
-func (r *InstanceTerminationReconciler) TerminateInstance(ctx context.Context, instance *clv1alpha2.Instance) error {
+func (r *InstanceInactiveTerminationReconciler) TerminateInstance(ctx context.Context, instance *clv1alpha2.Instance) error {
 	log := ctrl.LoggerFrom(ctx).WithName("termination")
 	log.Info("terminating instance")
 
