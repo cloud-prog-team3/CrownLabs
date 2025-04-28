@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package instautoctrl contains the controller for Instance Termination and Submission automations.
+// Package instautoctrl contains the controller for Instance Inactive Termination
 package instinactivectrl
 
 import (
@@ -180,23 +180,6 @@ func (r *InstanceInactiveTerminationReconciler) CheckInstanceTermination(ctx con
 func (r *InstanceInactiveTerminationReconciler) TerminateInstance(ctx context.Context, instance *clv1alpha2.Instance) error {
 	log := ctrl.LoggerFrom(ctx).WithName("termination")
 	log.Info("terminating instance")
-
-	submissionRequired := false
-
-	environment, err := RetrieveEnvironment(ctx, r.Client, instance)
-	if err != nil {
-		log.Info("failed retrieving environment", "error", err)
-		return err
-	}
-
-	if err := CheckEnvironmentValidity(instance, environment); err != nil {
-		log.Info("instance not eligible for submission", "error", err)
-	} else {
-		submissionRequired = true
-		log.Info("submission required")
-	}
-
-	instance.SetLabels(forge.InstanceAutomationLabelsOnTermination(instance.GetLabels(), submissionRequired))
 
 	instance.Spec.Running = false
 
