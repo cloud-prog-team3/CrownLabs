@@ -17,10 +17,7 @@ package instinactivectrl
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
-	"strconv"
 	"time"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,8 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	clv1alpha2 "github.com/netgroup-polito/CrownLabs/operators/api/v1alpha2"
-	"github.com/netgroup-polito/CrownLabs/operators/pkg/forge"
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/utils"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // InstanceInactiveTerminationReconciler watches for instances to be terminated.
@@ -59,6 +57,11 @@ func (r *InstanceInactiveTerminationReconciler) SetupWithManager(mgr ctrl.Manage
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: concurrency,
 		}).
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				return false
+			},
+		}).
 		WithLogConstructor(utils.LogConstructor(mgr.GetLogger(), "InstanceInactiveTermination")).
 		Complete(r)
 }
@@ -74,11 +77,11 @@ func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, r
 	tracer := trace.New("reconcile", trace.Field{Key: "instance", Value: req.NamespacedName})
 	ctx = ctrl.LoggerInto(trace.ContextWithTrace(ctx, tracer), log)
 
-	if dbgLog.Enabled() {
-		defer tracer.Log()
-	} else {
-		defer tracer.LogIfLong(r.StatusCheckRequestTimeout / 2)
-	}
+	// if dbgLog.Enabled() {
+	// 	defer tracer.Log()
+	// } else {
+	// 	defer tracer.LogIfLong(r.StatusCheckRequestTimeout / 2)
+	// }
 
 	// Get the instance object.
 	var instance clv1alpha2.Instance
@@ -91,89 +94,43 @@ func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, r
 
 	tracer.Step("instance retrieved")
 
-	// Skip if the instance has not to be terminated.
-	if !utils.CheckSingleLabel(&instance, forge.InstanceTerminationSelectorLabel, strconv.FormatBool(true)) {
-		dbgLog.Info("skipping instance", "reason", "label selector not matching", "label", forge.InstanceTerminationSelectorLabel)
-		return ctrl.Result{}, nil
-	}
-
-	// Check the selector label, in order to know whether to perform or not reconciliation.
-	if proceed, err := utils.CheckSelectorLabel(ctx, r.Client, instance.GetNamespace(), r.NamespaceWhitelist.MatchLabels); !proceed {
-		if err != nil {
-			err = fmt.Errorf("failed checking selector label: %w", err)
-		}
-		return ctrl.Result{}, err
-	}
-
-	tracer.Step("labels checked")
-
-	// Check if the instance has to be terminated.
 	terminate, err := r.CheckInstanceTermination(ctx, &instance)
 	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed checking instance termination: %w", err)
-	}
-
-	tracer.Step("status checked checked")
-
-	if terminate {
-		err := r.TerminateInstance(ctrl.LoggerInto(ctx, dbgLog), &instance)
-		if err != nil {
-			err = fmt.Errorf("failed terminating instance: %w", err)
-		} else {
-			tracer.Step("instance terminated")
-			log.Info("instance terminated")
-		}
+		log.Error(err, "failed checking instance termination")
 		return ctrl.Result{}, err
 	}
+	if terminate {
+		// retrieve the user owner of the instance
+		user, err := r.GetTenantFromInstance(ctx, &instance)
+		if err != nil {
+			log.Error(err, "failed retrieving user from instance")
+			return ctrl.Result{}, err
+		}
 
-	tracer.Step("instance requeued")
+		// send notification to the user
+		if instance.Status.TerminationAlerts < 3 {
+			r.SendNotification(ctx, &instance, user.Spec.Email)
+
+		} else if instance.Status.TerminationAlerts >= 3 && instance.Spec.Running == true {
+			r.TerminateInstance(ctx, &instance)
+		}
+	} else {
+		log.Info("instance is not yet to be terminated", "instance", instance.Name)
+	}
 
 	dbgLog.Info("requeueing instance")
-	return ctrl.Result{RequeueAfter: r.InstanceStatusCheckInterval}, nil
+	return ctrl.Result{RequeueAfter: 2 * time.Minute}, nil
 }
 
 // CheckInstanceTermination checks if the Instance has to be terminated.
 func (r *InstanceInactiveTerminationReconciler) CheckInstanceTermination(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
-	if instance.Spec.CustomizationUrls == nil {
-		return false, errors.New("customization urls field is not set for Instance")
-	}
 
-	statusCheckURL := instance.Spec.CustomizationUrls.StatusCheck
-	if statusCheckURL == "" {
-		return false, errors.New("status check url field is not set for Instance")
-	}
-
-	log := ctrl.LoggerFrom(ctx).WithName("status-check")
-	log.Info("performing instance status check")
-
-	statusCheckReponse := StatusCheckResponse{}
-	statusCode, err := utils.HTTPGetJSONIntoStruct(ctx, statusCheckURL, &statusCheckReponse, r.StatusCheckRequestTimeout)
-	if statusCode != http.StatusNotFound && err != nil {
-		return false, err
-	}
-
-	instance.Status.Automation.LastCheckTime = metav1.Now()
-	if statusCode == http.StatusOK {
-		instance.Status.Automation.TerminationTime = metav1.Time{Time: statusCheckReponse.Deadline}
-	} else if statusCode == http.StatusNotFound {
-		instance.Status.Automation.TerminationTime = metav1.Now()
-	}
-
-	if err := r.Status().Update(ctx, instance); err != nil {
-		log.Error(err, "failed updating instance status")
-		return false, err
-	}
-
-	switch statusCode {
-	case http.StatusOK:
-		log.Info("termination not required")
-		return false, nil
-	case http.StatusNotFound:
-		log.Info("termination required")
+	age := time.Since(instance.ObjectMeta.GetCreationTimestamp().Time)
+	if age > 1*time.Minute {
 		return true, nil
-	default:
-		return false, fmt.Errorf("failed: unexpected status code %d, retrieved error='%s'", statusCode, statusCheckReponse.Error)
 	}
+
+	return false, nil
 }
 
 // TerminateInstance terminates the Instance.
@@ -184,4 +141,38 @@ func (r *InstanceInactiveTerminationReconciler) TerminateInstance(ctx context.Co
 	instance.Spec.Running = false
 
 	return r.Update(ctx, instance)
+}
+
+// SendNotification sends an email to the user to notify that the instance will be terminated/stopped if they do not use it anymore.
+func (r *InstanceInactiveTerminationReconciler) SendNotification(ctx context.Context, instance *clv1alpha2.Instance, userEmail string) error {
+	// TODO: implement the email notification
+	log := ctrl.LoggerFrom(ctx).WithName("notification-email-instance")
+	log.Info("sending email notification to user", "instance", instance.Name, "email", userEmail)
+
+	// increment the number of termination alerts
+	instance.Status.TerminationAlerts++
+	if err := r.Status().Update(ctx, instance); err != nil {
+		log.Error(err, "failed updating instance status")
+	}
+
+	return nil
+}
+
+func (r *InstanceInactiveTerminationReconciler) GetTenantFromInstance(ctx context.Context, instance *clv1alpha2.Instance) (clv1alpha2.Tenant, error) {
+	log := ctrl.LoggerFrom(ctx).WithName("get-user-from-instance")
+	log.Info("getting user from instance", "instance", instance.Name)
+
+	tenant := &clv1alpha2.Tenant{}
+	if err := r.Client.Get(ctx, client.ObjectKey{
+		Name:      instance.Spec.Tenant.Name,
+		Namespace: instance.Namespace,
+	}, tenant); err != nil {
+		if kerrors.IsNotFound(err) {
+			log.Error(err, "user not found")
+			return clv1alpha2.Tenant{}, fmt.Errorf("user %s not found", instance.Spec.Tenant.Name)
+		}
+		log.Error(err, "failed retrieving user")
+		return clv1alpha2.Tenant{}, err
+	}
+	return *tenant, nil
 }
