@@ -24,6 +24,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/trace"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -247,11 +248,29 @@ func (r *InstanceInactiveTerminationReconciler) getPrometheusURL() string {
 // TerminateInstance terminates the Instance.
 func (r *InstanceInactiveTerminationReconciler) TerminateInstance(ctx context.Context, instance *clv1alpha2.Instance) error {
 	log := ctrl.LoggerFrom(ctx).WithName("termination")
-	log.Info("terminating instance")
+	log.Info("Terminating instance", "instance", instance.Name, " in namespace", instance.Namespace)
 
-	instance.Spec.Running = false
+	var template clv1alpha2.Template
+	var err = r.Get(ctx, types.NamespacedName{
+		Name:      instance.Spec.Template.Name,
+		Namespace: instance.Namespace,
+	}, &template)
+	if err != nil {
+		log.Error(err, "Unable to fetch the instance template.")
+		return err
+	}
 
-	return r.Update(ctx, instance)
+	//TODO check all the environments?
+	var environment = template.Spec.EnvironmentList[0]
+	if environment.Persistent {
+		log.Info("Stopping persistent instance...")
+		instance.Spec.Running = false
+		return r.Update(ctx, instance)
+	} else {
+		log.Info("Deleting non-persistent instance...")
+		return r.Delete(ctx, instance)
+	}
+
 }
 
 // SendNotification sends an email to the user to notify that the instance will be terminated/stopped if they do not use it anymore.
