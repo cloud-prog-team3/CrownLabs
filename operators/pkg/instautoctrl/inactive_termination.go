@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/smtp"
 	"strconv"
 	"time"
 
@@ -55,6 +56,13 @@ type InstanceInactiveTerminationReconciler struct {
 	// Specifically, it is meant to be set to GinkgoRecover during the tests,
 	// in order to lead to a controlled failure in case the Reconcile panics.
 	ReconcileDeferHook func()
+}
+
+var mailClient = &MailClient{
+	SMTPServer: "smtp.polito.it",
+	SMTPPort:   587,
+	auth:       smtp.PlainAuth("identity", "crownlabs", "password", "smtp.polito.it"),
+	From:       "crownlabs@polito.it",
 }
 
 // SetupWithManager registers a new controller for InstanceTerminationReconciler resources.
@@ -298,9 +306,15 @@ func (r *InstanceInactiveTerminationReconciler) TerminateInstance(ctx context.Co
 
 // SendNotification sends an email to the user to notify that the instance will be terminated/stopped if they do not use it anymore.
 func (r *InstanceInactiveTerminationReconciler) SendNotification(ctx context.Context, instance *clv1alpha2.Instance, userEmail string) error {
-	// TODO: implement the email notification
 	log := ctrl.LoggerFrom(ctx).WithName("notification-email-instance")
 	log.Info("sending email notification to user", "instance", instance.Name, "email", userEmail)
+	emailBody := fmt.Sprintf("Dear user,\n\n"+
+		"Your instance %s has been inactive for a while.\n"+
+		"We will terminate it if you do not use it anymore.\n\n"+
+		"Please log in to your instance if you wish to keep it running.\n\n"+
+		"Best regards,\n"+
+		"CrownLabs Team", instance.Name)
+	mailClient.SendMail([]string{userEmail}, "CrownLabs Instance Termination Alert", emailBody)
 
 	// increment the number of termination alerts
 	instance.Status.TerminationAlerts++
