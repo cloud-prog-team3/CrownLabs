@@ -136,9 +136,6 @@ type InstanceStatus struct {
 
 	// The actual nodeSelector assigned to the Instance.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// number of alerts sent to the user about the instance termination
-	TerminationAlerts int `json:"terminationAlerts,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -58,6 +58,11 @@ type InstanceInactiveTerminationReconciler struct {
 	ReconcileDeferHook func()
 }
 
+var alertAnnotation = "crownlabs.polito.it/number-alerts-sent"
+
+const maxNumberOfAlerts = 4
+const terminationInterval = 2 * time.Minute
+
 var mailClient = &MailClient{
 	SMTPServer: "smtp.polito.it",
 	SMTPPort:   587,
@@ -89,7 +94,6 @@ func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, r
 	if r.ReconcileDeferHook != nil {
 		defer r.ReconcileDeferHook()
 	}
-
 	log := ctrl.LoggerFrom(ctx, "instance", req.NamespacedName)
 	dbgLog := log.V(utils.LogDebugLevel)
 	tracer := trace.New("reconcile", trace.Field{Key: "instance", Value: req.NamespacedName})
@@ -128,11 +132,26 @@ func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, r
 
 	tracer.Step("labels checked")
 
+	// add the annotation if not present to check the number of termination alerts
+	if instance.ObjectMeta.Annotations == nil {
+		instance.ObjectMeta.Annotations = make(map[string]string)
+
+	}
+	patch := client.MergeFrom(instance.DeepCopy())
+	if _, ok := instance.ObjectMeta.Annotations[alertAnnotation]; !ok {
+		log.Info("adding annotation to instance for the first time", "annotation", alertAnnotation)
+		instance.ObjectMeta.Annotations[alertAnnotation] = "0"
+
+		// update the instance with the new annotation
+		_ = r.Patch(ctx, &instance, patch)
+	}
+
 	terminate, err := r.CheckInstanceTermination(ctx, &instance)
 	if err != nil {
 		log.Error(err, "failed checking instance termination")
 		return ctrl.Result{}, err
 	}
+	log.Info("instance termination check", "terminate", terminate)
 	if terminate {
 		// retrieve the user owner of the instance
 		user, err := r.GetTenantFromInstance(ctx, &instance)
@@ -142,9 +161,15 @@ func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, r
 		}
 
 		// send notification to the user
-		if instance.Status.TerminationAlerts < 3 {
+		numberAlertSent, err := strconv.Atoi(instance.ObjectMeta.Annotations[alertAnnotation])
+		if err != nil {
+			log.Error(err, "failed converting string of alerts sent in int number")
+			return ctrl.Result{}, err
+		}
+
+		if numberAlertSent < maxNumberOfAlerts {
 			r.SendNotification(ctx, &instance, user.Spec.Email)
-		} else if instance.Status.TerminationAlerts >= 3 && instance.Spec.Running == true {
+		} else if numberAlertSent >= maxNumberOfAlerts && instance.Spec.Running == true {
 			r.TerminateInstance(ctx, &instance)
 		}
 	} else {
@@ -153,12 +178,16 @@ func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, r
 
 	dbgLog.Info("requeueing instance")
 	// TODO: where to put delay time? general for all crownlab machines?
-	return ctrl.Result{RequeueAfter: 2 * time.Minute}, nil
+	return ctrl.Result{RequeueAfter: terminationInterval}, nil
 }
 
 // CheckInstanceTermination checks if the Instance has to be terminated.
 func (r *InstanceInactiveTerminationReconciler) CheckInstanceTermination(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
 	log := ctrl.LoggerFrom(ctx).WithName("check-instance-termination")
+
+	if time.Since(instance.CreationTimestamp.Time) > 2*time.Minute {
+		return true, nil
+	}
 
 	promURL := r.getPrometheusURL()
 
@@ -317,9 +346,14 @@ func (r *InstanceInactiveTerminationReconciler) SendNotification(ctx context.Con
 	mailClient.SendMail([]string{userEmail}, "CrownLabs Instance Termination Alert", emailBody)
 
 	// increment the number of termination alerts
-	instance.Status.TerminationAlerts++
-	if err := r.Status().Update(ctx, instance); err != nil {
-		log.Error(err, "failed updating instance status")
+	newNumberOfAlerts, err := r.IncrementAnnotation(ctx, instance.ObjectMeta.Annotations[alertAnnotation])
+	if err != nil {
+		log.Error(err, "failed incrementing annotation")
+	}
+	instance.ObjectMeta.Annotations[alertAnnotation] = newNumberOfAlerts
+	// update the status of the instance
+	if err := r.Update(ctx, instance); err != nil {
+		log.Error(err, "failed updating instance annotations")
 	}
 
 	return nil
@@ -342,4 +376,21 @@ func (r *InstanceInactiveTerminationReconciler) GetTenantFromInstance(ctx contex
 		return clv1alpha2.Tenant{}, err
 	}
 	return *tenant, nil
+}
+
+func (r *InstanceInactiveTerminationReconciler) IncrementAnnotation(ctx context.Context, annotationString string) (string, error) {
+	log := ctrl.LoggerFrom(ctx).WithName("string-to-int-annotation")
+	log.Info("converting string to int annotation", "annotation", annotationString)
+
+	annotationInt, err := strconv.Atoi(annotationString)
+	if err != nil {
+		log.Error(err, "failed converting string to int")
+		return "0", fmt.Errorf("failed converting string to int: %w", err)
+	}
+	annotationInt++
+	log.Info("incrementing annotation", "annotation", annotationInt)
+
+	annotationString = strconv.Itoa(annotationInt)
+	log.Info("converting int to string updated annotation", "annotation", annotationString)
+	return annotationString, nil
 }
