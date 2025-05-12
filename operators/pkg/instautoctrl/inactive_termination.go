@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 
 	clv1alpha2 "github.com/netgroup-polito/CrownLabs/operators/api/v1alpha2"
+	"github.com/netgroup-polito/CrownLabs/operators/pkg/forge"
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/utils"
+
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
@@ -100,6 +103,22 @@ func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, r
 	}
 
 	tracer.Step("instance retrieved")
+
+	// Skip if the instance has not to be terminated.
+	if !utils.CheckSingleLabel(&instance, forge.InstanceTerminationSelectorLabel, strconv.FormatBool(true)) {
+		dbgLog.Info("skipping instance", "reason", "label selector not matching", "label", forge.InstanceTerminationSelectorLabel)
+		return ctrl.Result{}, nil
+	}
+
+	// Check the selector label, in order to know whether to perform or not reconciliation.
+	if proceed, err := utils.CheckSelectorLabel(ctx, r.Client, instance.GetNamespace(), r.NamespaceWhitelist.MatchLabels); !proceed {
+		if err != nil {
+			err = fmt.Errorf("failed checking selector label: %w", err)
+		}
+		return ctrl.Result{}, err
+	}
+
+	tracer.Step("labels checked")
 
 	terminate, err := r.CheckInstanceTermination(ctx, &instance)
 	if err != nil {
