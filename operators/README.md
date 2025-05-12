@@ -140,6 +140,7 @@ The SSH bastion is composed of two basic blocks:
 
 1. `bastion-operator`: an operator based on on [Kubebuilder 2.3](https://github.com/kubernetes-sigs/kubebuilder.git)
 2. `ssh-bastion`: a lightweight alpine based container running [sshd](https://man.cx/sshd)
+3. `bastion-ssh-tracker`: a golang app that tracks the SSH connections going from the bastion host to the target host, and exposes metrics to Prometheus.
 
 #### SSH Key generation
 
