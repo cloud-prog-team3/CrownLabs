@@ -26,4 +26,10 @@ securityContext:
 
 ## TODO
 - Expose metrics to Prometheus
-- Reverse lookup to get the hostname of the target host
+- Reverse lookup to get the hostname of the target host:
+Reverse lookup is highly inefficient since we would need to do it for each ssh connection (or even each packet).
+So it is better to match the IP with the Pod at level of the inactive instance controller.
+
+## TODO
+It could make sense to deploy as a separate container rather than a sidecar container since if it fails it could take down the whole bastion.
+In case as a separate container, it would need to have `network=host`.
