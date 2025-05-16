@@ -25,7 +25,7 @@ configurations:
     secretName: registry-credentials
   maxConcurrentReconciles: 1
   automation:
-    maxConcurrentSubmissionReconciles: 1 
+    maxConcurrentShVolReconciles: 1 
   sharedVolumeOptions:
     storageClass: rook-nfs
 

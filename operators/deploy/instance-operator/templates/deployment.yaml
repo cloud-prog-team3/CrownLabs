@@ -48,7 +48,7 @@ spec:
             - "--container-export-img={{ .Values.configurations.containerVmSnapshots.exportImage }}:{{ include "instance-operator.containerExportImageTag" . }}"
             - "--container-kaniko-img={{ .Values.configurations.containerVmSnapshots.kanikoImage }}"
             - "--max-concurrent-reconciles={{ .Values.configurations.maxConcurrentReconciles }}"
-            - "--max-concurrent-reconciles-submission={{ .Values.configurations.automation.maxConcurrentSubmissionReconciles }}"
+            - "--max-concurrent-reconciles-shvol={{ .Values.configurations.automation.maxConcurrentShVolReconciles }}"
             - "--shared-volume-storage-class={{ .Values.configurations.sharedVolumeOptions.storageClass }}"
           ports:
             - name: metrics
