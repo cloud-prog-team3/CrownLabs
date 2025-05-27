@@ -50,7 +50,7 @@ type InstanceInactiveTerminationReconciler struct {
 	NamespaceWhitelist          metav1.LabelSelector
 	StatusCheckRequestTimeout   time.Duration
 	InstanceStatusCheckInterval time.Duration
-	MailClient                  *MailClient
+	MailClient                  *utils.MailClient
 	// This function, if configured, is deferred at the beginning of the Reconcile.
 	// Specifically, it is meant to be set to GinkgoRecover during the tests,
 	// in order to lead to a controlled failure in case the Reconcile panics.

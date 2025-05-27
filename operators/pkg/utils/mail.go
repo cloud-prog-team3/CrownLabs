@@ -1,4 +1,4 @@
-package instautoctrl
+package utils
 
 import (
 	"net/smtp"

@@ -40,12 +40,13 @@ import (
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/forge"
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/instautoctrl"
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/instctrl"
+	"github.com/netgroup-polito/CrownLabs/operators/pkg/utils"
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/utils/restcfg"
 )
 
 var (
 	scheme     = runtime.NewScheme()
-	mailClient *instautoctrl.MailClient
+	mailClient *utils.MailClient
 )
 
 func init() {
@@ -100,7 +101,7 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
-	mailClient = &instautoctrl.MailClient{
+	mailClient = &utils.MailClient{
 		SMTPServer: *smtpServer,
 		SMTPPort:   *smtpPort,
 		Auth:       smtp.PlainAuth(*smtpIdentity, *smtpUsername, *smtpPassword, *smtpServer),
