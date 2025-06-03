@@ -1,68 +1,107 @@
 package instautoctrl_test
 
 import (
+	"context"
+	"net/smtp"
 	"path/filepath"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	gomegaTypes "github.com/onsi/gomega/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2/textlogger"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/instautoctrl"
 	"github.com/netgroup-polito/CrownLabs/operators/pkg/utils/tests"
 
-	clv1alpha2 "github.com/netgroup-polito/CrownLabs/operators/api/v1alpha2"
+	crownlabsv1alpha2 "github.com/netgroup-polito/CrownLabs/operators/api/v1alpha2"
 )
+
+var ctx context.Context
+var cancel context.CancelFunc
+var cfg *rest.Config
+var k8sClient client.Client
+var testEnv *envtest.Environment
+var instanceInactiveTerminationReconciler instautoctrl.InstanceInactiveTerminationReconciler
 
 func TestInstautoctrl(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Instautoctrl Suite")
 }
 
-var (
-	instanceInactiveTerminationReconciler instautoctrl.InstanceInactiveTerminationReconciler
-	k8sClient                             client.Client
-	testEnv                               = envtest.Environment{
-		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "deploy", "crds"),
-			filepath.Join("..", "..", "tests", "crds"),
-		},
-		ErrorIfCRDPathMissing: true,
-	}
-	whiteListMap = map[string]string{"production": "true"}
-)
-
 var _ = BeforeSuite(func() {
+	ctx, cancel = context.WithCancel(context.Background())
 	tests.LogsToGinkgoWriter()
 
-	cfg, err := testEnv.Start()
+	By("bootstrapping test environment")
+	testEnv = &envtest.Environment{
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "deploy", "crds"),
+			filepath.Join("..", "..", "tests", "crds")},
+		ErrorIfCRDPathMissing: true,
+	}
+	var err error
+	cfg, err = testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
-	Expect(clv1alpha2.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	err = crownlabsv1alpha2.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
-	ctrl.SetLogger(textlogger.NewLogger(textlogger.NewConfig()))
-
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	// +kubebuilder:scaffold:scheme
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme:  scheme.Scheme,
+		Metrics: server.Options{BindAddress: "0"},
+	})
 	Expect(err).ToNot(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
 
-	instanceInactiveTerminationReconciler = instautoctrl.InstanceInactiveTerminationReconciler{
-		Client:             k8sClient,
-		Scheme:             scheme.Scheme,
-		EventsRecorder:     record.NewFakeRecorder(1024),
-		NamespaceWhitelist: metav1.LabelSelector{MatchLabels: whiteListMap},
-		ReconcileDeferHook: GinkgoRecover,
+	// Generate whitelist map for InstanceSnapshot controller reconciliation
+	whiteListMap := map[string]string{
+		"test-suite": "true",
 	}
+
+	err = (&instautoctrl.InstanceInactiveTerminationReconciler{
+		Client:             k8sManager.GetClient(),
+		Scheme:             k8sManager.GetScheme(),
+		EventsRecorder:     k8sManager.GetEventRecorderFor("instance-snapshot"),
+		NamespaceWhitelist: metav1.LabelSelector{MatchLabels: whiteListMap, MatchExpressions: []metav1.LabelSelectorRequirement{}},
+		MailClient: &instautoctrl.MailClient{
+			SMTPServer: "localhost",
+			SMTPPort:   1025,
+			From:       "test@test.com",
+			Auth:       smtp.PlainAuth("", "testuser", "testpassword", "localhost"),
+		},
+		InstanceInactivityCheckInterval: 2 * time.Minute,
+		InstanceMaxNumberOfAlerts:       3,
+		InstanceInactiveDefaultTimeout:  "14d",
+		StatusCheckRequestTimeout:       30 * time.Second,
+	}).SetupWithManager(k8sManager, 1)
+	Expect(err).ToNot(HaveOccurred())
+
+	go func() {
+		err = k8sManager.Start(ctx)
+		Expect(err).ToNot(HaveOccurred())
+	}()
+
+	k8sClient = k8sManager.GetClient()
+	Expect(k8sClient).ToNot(BeNil())
 })
 
 var _ = AfterSuite(func() {
 	Expect(testEnv.Stop()).To(Succeed())
 })
+
+func doesEventuallyExists(ctx context.Context, objLookupKey types.NamespacedName, targetObj client.Object, expectedStatus gomegaTypes.GomegaMatcher, timeout, interval time.Duration) {
+	Eventually(func() bool {
+		err := k8sClient.Get(ctx, objLookupKey, targetObj)
+		return err == nil
+	}, timeout, interval).Should(expectedStatus)
+}
