@@ -474,16 +474,14 @@ func (r *InstanceInactiveTerminationReconciler) delete_stale_instances(ctx conte
 	if err != nil {
 		if kerrors.IsNotFound(err) {
 			return false, fmt.Errorf("template not found: name=%s, namespace=%s", instance.Spec.Template.Name, instance.Spec.Template.Namespace)
-
 		}
 		return false, fmt.Errorf("failed to retrieve template for instance %s: %w", instance.Name, err)
 	}
 
-	//get the deleteAfter field from the template
+	// get the deleteAfter field from the template
 	deleteAfter := template.Spec.DeleteAfter
 	if deleteAfter == "never" {
 		return false, fmt.Errorf("template %s has deleteAfter set to 'never', skipping deletion", template.Name)
-
 	}
 
 	lifespan, err := convertToSeconds(deleteAfter)
@@ -510,15 +508,12 @@ func (r *InstanceInactiveTerminationReconciler) delete_stale_instances(ctx conte
 				log.Info("Instance already deleted", "instance", instance.GetName(), "namespace", instance.GetNamespace())
 				return false, nil
 			}
-			return false, fmt.Errorf("failed to delete instance %s/%s: %v", instance.GetNamespace(), instance.GetName(), err)
-
+			return false, fmt.Errorf("failed to delete instance %s/%s: %w", instance.GetNamespace(), instance.GetName(), err)
 		}
 		log.Info("Instance is expired and has been deleted", instance.GetName(), instance.GetNamespace())
 		return true, nil
-
 	} else {
 		log.Info("Instance is not expired, skipping deletion", instance.GetName(), instance.GetNamespace())
 	}
-
 	return false, nil
 }
