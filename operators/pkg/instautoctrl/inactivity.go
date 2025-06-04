@@ -185,14 +185,8 @@ func (r *InstanceInactiveTerminationReconciler) Reconcile(ctx context.Context, r
 	return ctrl.Result{RequeueAfter: r.InstanceInactivityCheckInterval}, nil
 }
 
-// CheckInstanceTermination checks if the Instance has to be terminated.
-func (r *InstanceInactiveTerminationReconciler) CheckInstanceTermination(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
-	log := ctrl.LoggerFrom(ctx).WithName("check-instance-termination")
-
-	// to make a local test, uncomment the following lines
-	// if time.Since(instance.CreationTimestamp.Time) > 2*time.Minute {
-	// 	return true, nil
-	// }
+func (r *InstanceInactiveTerminationReconciler) UpdateInstanceLastLogin(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
+	log := ctrl.LoggerFrom(ctx).WithName("update-instance-last-login")
 
 	promURL := r.getPrometheusURL()
 
@@ -228,16 +222,12 @@ func (r *InstanceInactiveTerminationReconciler) CheckInstanceTermination(ctx con
 	}
 
 	// Proper PromQL query to check for activity
-	query := fmt.Sprintf(`sum(changes(nginx_ingress_controller_requests{exported_namespace=%q, exported_service=%q}[%q])) > 0`,
-		tenantNS, instanceName, inactivityTimeout)
+	query := fmt.Sprintf(`nginx_ingress_controller_requests{exported_namespace=%q, exported_service=%q}`, //TODO aggiornare, dobbiamo solo settare il lastLogin
+		tenantNS, instanceName)
 
 	result, warnings, err := v1api.Query(ctx, query, time.Now())
 	if err != nil {
 		return false, fmt.Errorf("error querying prometheus: %w", err)
-	}
-
-	if len(warnings) > 0 {
-		log.Info("Prometheus query warnings", "warnings", warnings)
 	}
 
 	vec, ok := result.(model.Vector)
@@ -252,8 +242,38 @@ func (r *InstanceInactiveTerminationReconciler) CheckInstanceTermination(ctx con
 		}
 	}
 
-	// No activity detected
-	log.Info("No activity detected", "instance", instanceName)
+	if len(warnings) > 0 {
+		log.Info("Prometheus query warnings", "warnings", warnings)
+	}
+
+	//TODO
+	//instance.Status.LastLogin = qucalcosa
+
+}
+
+// CheckInstanceTermination checks if the Instance has to be terminated.
+func (r *InstanceInactiveTerminationReconciler) CheckInstanceTermination(ctx context.Context, instance *clv1alpha2.Instance) (bool, error) {
+	log := ctrl.LoggerFrom(ctx).WithName("check-instance-termination")
+
+	// to make a local test, uncomment the following lines
+	// if time.Since(instance.CreationTimestamp.Time) > 2*time.Minute {
+	// 	return true, nil
+	// }
+
+	// get the inactivity timeout from the instance template
+	inactivityTimeout, err := r.getInactivityTimeout(ctx, instance)
+	if err != nil {
+		log.Error(err, "failed retrieving inactivity timeout from instance template")
+		return false, err
+	}
+
+	/*
+		if Time.now()-instance.Spec.LastLogin > inactivityTimeout {
+			log.Info("Instance inactivity detected ", "instance", instanceName)
+			return true, nil
+		}
+	*/
+
 	return false, nil
 }
 
