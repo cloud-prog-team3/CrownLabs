@@ -24,6 +24,7 @@ var _ = Describe("Instautoctrl", func() {
 		persistentTemplateName    = "test-template-persistent"
 		nonPersistentTemplateName = "test-template-non-persistent"
 		TenantName                = "test-tenant"
+		CustomDeleteAfter         = "30d"
 
 		timeout  = time.Second * 20
 		interval = time.Millisecond * 500
@@ -59,7 +60,7 @@ var _ = Describe("Instautoctrl", func() {
 					Image:           "crownlabs/vm",
 				},
 			},
-			DeleteAfter:       "30d",
+			DeleteAfter:       CustomDeleteAfter,
 			InactivityTimeout: "14d",
 		}
 		templateNonPersistentEnvironment = crownlabsv1alpha2.TemplateSpec{
@@ -80,8 +81,6 @@ var _ = Describe("Instautoctrl", func() {
 					Image:           "crownlabs/vm",
 				},
 			},
-			DeleteAfter:       "30d",
-			InactivityTimeout: "14d",
 		}
 		persistentTemplate = crownlabsv1alpha2.Template{
 			TypeMeta: metav1.TypeMeta{},
@@ -146,7 +145,6 @@ var _ = Describe("Instautoctrl", func() {
 		newNonPersistentTemplate := nonPersistentTemplate.DeepCopy()
 		newPersistentInstance := persistentInstance.DeepCopy()
 		newNonPersistentInstance := nonPersistentInstance.DeepCopy()
-
 		By("Creating the namespace where to create instance and template")
 		err := k8sClient.Create(ctx, newNs)
 		if err != nil && errors.IsAlreadyExists(err) {
@@ -194,16 +192,79 @@ var _ = Describe("Instautoctrl", func() {
 		doesEventuallyExists(ctx, nonPersistentInstanceLookupKey, createdNonPersistentInstance, BeTrue(), timeout, interval)
 	})
 
-	Context("Creating a snapshot of a persistent VM", func() {
-		It("Should start snapshot creation given an environment name", func() {
+	Context("Testing maximum time instance deletion", func() {
+		It("Should succed: the VM did not reach the maximum deletion time", func() {
+			By("Getting current instance")
+			currentInstance := &crownlabsv1alpha2.Instance{}
+			instanceLookupKey := types.NamespacedName{Name: PersistentInstanceName, Namespace: WorkingNamespace}
+			Expect(k8sClient.Get(ctx, instanceLookupKey, currentInstance)).Should(Succeed())
+
+			By("Checking the VM still exists")
+			doesEventuallyExists(ctx, instanceLookupKey, currentInstance, BeTrue(), timeout, interval)
 		})
+		It("Should fail: the VM reached the maximum deletion time", func() {
+			By("Getting current instance")
+			currentInstance := &crownlabsv1alpha2.Instance{}
+			instanceLookupKey := types.NamespacedName{Name: PersistentInstanceName, Namespace: WorkingNamespace}
+			Expect(k8sClient.Get(ctx, instanceLookupKey, currentInstance)).Should(Succeed())
+
+			// creation Timestamp cannot be modified, it is always set to time.Now().
+			// TO DO
+		})
+
 	})
 
-	Context("Testing incorrect environment configurations", func() {
-		It("Should fail: the VM is running", func() {
+	Context("Testing default values", func() {
+		It("Should succed: the Non-Persistent template provides the default DeleteAfter field", func() {
+			By("Getting current templates")
+			currentTemplate := &crownlabsv1alpha2.Template{}
+
+			templateLookupKey := types.NamespacedName{Name: nonPersistentTemplateName, Namespace: WorkingNamespace}
+			Expect(k8sClient.Get(ctx, templateLookupKey, currentTemplate)).Should(Succeed())
+
+			By("Checking the DeleteField is the default one")
+			currentDeleteAfter := currentTemplate.Spec.DeleteAfter
+			defaultDeleteAfter := "never"
+			Expect(currentDeleteAfter).To(Equal(defaultDeleteAfter))
+
 		})
+		It("Should succed: the Persistent template has a custom DeleteAfter field", func() {
+			By("Getting current templates")
+			currentTemplate := &crownlabsv1alpha2.Template{}
+
+			templateLookupKey := types.NamespacedName{Name: persistentTemplateName, Namespace: WorkingNamespace}
+			Expect(k8sClient.Get(ctx, templateLookupKey, currentTemplate)).Should(Succeed())
+
+			By("Checking the DeleteField is the custom one")
+			currentDeleteAfter := currentTemplate.Spec.DeleteAfter
+			Expect(currentDeleteAfter).To(Equal(CustomDeleteAfter))
+
+		})
+		// It("Should succed: the Non-Persistent template provides the default InactivityTimeout field", func() {
+
+		// })
+		// It("Should succed: the Persistent template has a custom InactivityTimeout field", func() {
+
+		// })
+
 	})
 
-	Context("Testing snapshotting job failures", func() {
-	})
+	// Context("Testing maximum inactivity time", func() {
+	// 	It("Should succed: the VM is active and does not send alerts", func() {
+
+	// 	})
+	// 	It("Should fail: the VM is inactive and it sends the first alert", func() {
+
+	// 	})
+	// 	It("Should fail: the persistent VM is inactive for a long time and it is stopped", func() {
+
+	// 	})
+	// 	It("Should fail: the non-persistent VM is inactive for a long time it is deleted", func() {
+
+	// 	})
+
+	// })
+
+	// tests for prometheus healthy??
+
 })

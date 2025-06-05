@@ -33,6 +33,8 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 var instanceInactiveTerminationReconciler instautoctrl.InstanceInactiveTerminationReconciler
 
+//var log logr.Logger
+
 func TestInstautoctrl(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Instautoctrl Suite")
@@ -41,6 +43,12 @@ func TestInstautoctrl(t *testing.T) {
 var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.Background())
 	tests.LogsToGinkgoWriter()
+	// opts := zap.Options{
+	// 	Development: true,
+	// }
+	// opts.BindFlags(flag.CommandLine)
+	// log = zap.New(zap.UseFlagOptions(&opts))
+	// ctrl.SetLogger(log)
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
@@ -96,7 +104,10 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	Expect(testEnv.Stop()).To(Succeed())
+	By("tearing down the test environment")
+	cancel()
+	err := testEnv.Stop()
+	Expect(err).ToNot(HaveOccurred())
 })
 
 func doesEventuallyExists(ctx context.Context, objLookupKey types.NamespacedName, targetObj client.Object, expectedStatus gomegaTypes.GomegaMatcher, timeout, interval time.Duration) {
