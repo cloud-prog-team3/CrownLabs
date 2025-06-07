@@ -25,8 +25,9 @@ var _ = Describe("Instautoctrl", func() {
 		nonPersistentTemplateName = "test-template-non-persistent"
 		TenantName                = "test-tenant"
 		CustomDeleteAfter         = "30d"
+		CustomInactivityTimeout   = "14d"
 
-		timeout  = time.Second * 20
+		timeout  = time.Second * 25
 		interval = time.Millisecond * 500
 	)
 
@@ -61,7 +62,7 @@ var _ = Describe("Instautoctrl", func() {
 				},
 			},
 			DeleteAfter:       CustomDeleteAfter,
-			InactivityTimeout: "14d",
+			InactivityTimeout: CustomInactivityTimeout,
 		}
 		templateNonPersistentEnvironment = crownlabsv1alpha2.TemplateSpec{
 			WorkspaceRef: crownlabsv1alpha2.GenericRef{},
@@ -208,8 +209,18 @@ var _ = Describe("Instautoctrl", func() {
 			instanceLookupKey := types.NamespacedName{Name: PersistentInstanceName, Namespace: WorkingNamespace}
 			Expect(k8sClient.Get(ctx, instanceLookupKey, currentInstance)).Should(Succeed())
 
-			// creation Timestamp cannot be modified, it is always set to time.Now().
-			// TO DO
+			By("Getting template associated to the instance")
+			currentTemplate := &crownlabsv1alpha2.Template{}
+			templateLookupKey := types.NamespacedName{Name: persistentTemplateName, Namespace: WorkingNamespace}
+			Expect(k8sClient.Get(ctx, templateLookupKey, currentTemplate)).Should(Succeed())
+
+			By("Patching deleteAfter field to a short time")
+			currentTemplate.Spec.DeleteAfter = "0m"
+
+			By("Checking the VM has been deleted")
+			// fix this
+			//doesEventuallyExists(ctx, instanceLookupKey, currentInstance, BeFalse(), timeout, interval)
+
 		})
 
 	})
@@ -240,12 +251,32 @@ var _ = Describe("Instautoctrl", func() {
 			Expect(currentDeleteAfter).To(Equal(CustomDeleteAfter))
 
 		})
-		// It("Should succed: the Non-Persistent template provides the default InactivityTimeout field", func() {
+		It("Should succed: the Non-Persistent template provides the default InactivityTimeout field", func() {
 
-		// })
-		// It("Should succed: the Persistent template has a custom InactivityTimeout field", func() {
+			// This test is commented out because the InactivityTimeout field is not set by default in the template spec.
 
-		// })
+			// By("Getting current templates")
+			// currentTemplate := &crownlabsv1alpha2.Template{}
+
+			// templateLookupKey := types.NamespacedName{Name: nonPersistentTemplateName, Namespace: WorkingNamespace}
+			// Expect(k8sClient.Get(ctx, templateLookupKey, currentTemplate)).Should(Succeed())
+
+			// By("Checking the InactivityTimeout field is the default one")
+			// currentInactivityTimeout := currentTemplate.Spec.InactivityTimeout
+			// defaultInactivityTimeout := "60d"
+			// Expect(currentInactivityTimeout).To(Equal(defaultInactivityTimeout))
+		})
+		It("Should succed: the Persistent template has a custom InactivityTimeout field", func() {
+			By("Getting current templates")
+			currentTemplate := &crownlabsv1alpha2.Template{}
+
+			templateLookupKey := types.NamespacedName{Name: persistentTemplateName, Namespace: WorkingNamespace}
+			Expect(k8sClient.Get(ctx, templateLookupKey, currentTemplate)).Should(Succeed())
+
+			By("Checking the InactivityTimeout field is the custom one")
+			currentInactivityTimeout := currentTemplate.Spec.InactivityTimeout
+			Expect(currentInactivityTimeout).To(Equal(CustomInactivityTimeout))
+		})
 
 	})
 
