@@ -577,8 +577,8 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 				AnyTimes()
 
 			mockProm.EXPECT().
-				GetLastActivityTime(gomock.Any(), gomock.Any()).
-				Return(time.Now().Add(-100*time.Hour), nil).
+				GetQuerySSHData().
+				Return("").
 				AnyTimes()
 
 			mockProm.EXPECT().
@@ -587,8 +587,8 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 				AnyTimes()
 
 			mockProm.EXPECT().
-				GetQuerySSHData().
-				Return("").
+				GetLastActivityTime(gomock.Any(), gomock.Any()).
+				Return(time.Now().Add(-100*time.Hour), nil).
 				AnyTimes()
 
 			By("Getting current instance")
