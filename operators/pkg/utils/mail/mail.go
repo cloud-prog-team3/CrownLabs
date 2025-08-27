@@ -58,10 +58,10 @@ type Placeholders struct {
 	InstanceName string `name:"instanceName"`
 }
 
-// NewMailClientFromFilesystem creates a new Client instance that reads templates from filesystem paths.
-func NewMailClientFromFilesystem(templateDir string) (*Client, error) {
+// NewMailClientFromFilesystem creates a new Client instance that reads configs and templates from filesystem paths.
+func NewMailClientFromFilesystem(configDir, templateDir string) (*Client, error) {
 	// Load SMTP configuration from filesystem
-	configPath := filepath.Join(templateDir, "smtp-config.yaml")
+	configPath := filepath.Join(configDir, "smtp-config.yaml")
 
 	configFile, err := os.Open(configPath)
 	if err != nil {
@@ -153,7 +153,7 @@ func (m *Client) SendCrownLabsMail(emailContentTemplatePath string, ph Placehold
 		return err
 	}
 
-	formattedEmail, err := m.prepareFinalEmail(emailContent)
+	formattedEmail, err := m.PrepareFinalEmail(emailContent)
 	if err != nil {
 		return err
 	}
@@ -206,8 +206,8 @@ func (m *Client) processEmailContentTemplate(templatePath string, ph Placeholder
 	return emailValues, nil
 }
 
-// prepareFinalEmail prepares the final email by combining the base template with content.
-func (m *Client) prepareFinalEmail(emailContent map[string]string) (string, error) {
+// PrepareFinalEmail prepares the final email by combining the base template with content.
+func (m *Client) PrepareFinalEmail(emailContent map[string]string) (string, error) {
 	// Get the entire email template
 	crownlabsEmailTemplate, err := m.readTemplateFile(CrownlabsMailTemplatePath)
 	if err != nil {

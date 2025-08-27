@@ -5,7 +5,6 @@
 replicaCount: 1
 replicaCountAutomation: 1
 configurations:
-  mailTemplateDir: /etc/mail-templates
   generic:
     whitelistLabels: crownlabs.polito.it/operator-selector=production
     websiteBaseUrl: crownlabs.example.com
@@ -34,6 +33,8 @@ configurations:
     queryBastionSSHAvailable: count(up{container="bastion-operator-tracker-sidecar"})
     queryNginxData: nginx_ingress_controller_requests{exported_namespace="%s", exported_service="%s"}
     queryBastionSSHData: bastion_ssh_connections{destination_ip="%s"}
+  mailTemplateDir: /etc/crownmail/templates
+  mailConfigDir: /etc/crownmail/configs
   automation:
     enableInstanceSubmission: true
     enableInstanceTermination: true
