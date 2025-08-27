@@ -46,8 +46,8 @@ configurations:
     terminationStatusCheckInterval: "2m"
     inactiveTerminationStatusCheckTimeout: "15s"
     inactiveTerminationMaxNumberOfAlerts: 3
-    enableInactivityNotifications: true
-    enableExpirationNotifications: true
+    enableInactivityNotifications: false
+    enableExpirationNotifications: false
     notificationInterval: "24h"
 image:
   repository: crownlabs/instance-operator
