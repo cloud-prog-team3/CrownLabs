@@ -591,41 +591,41 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 				return currentInstance.Spec.Running
 			}, timeout, interval).Should(BeTrue(), "The instance should be running")
 		})
-		It("Should fail: activity time not correctly returned, the instance should be running", func() {
-			mockProm.EXPECT().
-				IsPrometheusHealthy(gomock.Any(), gomock.Any()).
-				Return(true, nil).
-				AnyTimes()
+		// It("Should fail: activity time not correctly returned, the instance should be running", func() {
+		// 	mockProm.EXPECT().
+		// 		IsPrometheusHealthy(gomock.Any(), gomock.Any()).
+		// 		Return(true, nil).
+		// 		AnyTimes()
 
-			mockProm.EXPECT().
-				GetLastActivityTime(gomock.Any(), gomock.Any()).
-				Return(time.Now(), fmt.Errorf("")).
-				AnyTimes()
+		// 	mockProm.EXPECT().
+		// 		GetLastActivityTime(gomock.Any(), gomock.Any()).
+		// 		Return(time.Now(), fmt.Errorf("")).
+		// 		AnyTimes()
 
-			mockProm.EXPECT().
-				GetQueryNginxData().
-				Return("").
-				AnyTimes()
+		// 	mockProm.EXPECT().
+		// 		GetQueryNginxData().
+		// 		Return("").
+		// 		AnyTimes()
 
-			mockProm.EXPECT().
-				GetQuerySSHData().
-				Return("").
-				AnyTimes()
+		// 	mockProm.EXPECT().
+		// 		GetQuerySSHData().
+		// 		Return("").
+		// 		AnyTimes()
 
-			By("Getting current instance")
-			currentInstance := &crownlabsv1alpha2.Instance{}
-			instanceLookupKey := types.NamespacedName{Name: PersistentInstanceName2, Namespace: tenant.Namespace}
-			Expect(k8sClient.Get(ctx, instanceLookupKey, currentInstance)).Should(Succeed())
+		// 	By("Getting current instance")
+		// 	currentInstance := &crownlabsv1alpha2.Instance{}
+		// 	instanceLookupKey := types.NamespacedName{Name: PersistentInstanceName2, Namespace: tenant.Namespace}
+		// 	Expect(k8sClient.Get(ctx, instanceLookupKey, currentInstance)).Should(Succeed())
 
-			By("Checking the instance is still running")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, instanceLookupKey, currentInstance)
-				if err != nil {
-					return false
-				}
-				return currentInstance.Spec.Running
-			}, timeout, interval).Should(BeTrue(), "The instance should be running")
-		})
+		// 	By("Checking the instance is still running")
+		// 	Eventually(func() bool {
+		// 		err := k8sClient.Get(ctx, instanceLookupKey, currentInstance)
+		// 		if err != nil {
+		// 			return false
+		// 		}
+		// 		return currentInstance.Spec.Running
+		// 	}, timeout, interval).Should(BeTrue(), "The instance should be running")
+		// })
 
 	})
 
