@@ -33,15 +33,17 @@ type Prometheus struct {
 	address                  string
 	queryNginxAvailable      string
 	queryBastionSSHAvailable string
+	queryWebSSHAvailable     string
 	queryNginxData           string
 	queryBastionSSHData      string
+	queryWebSSHData          string
 	client                   v1.API
 }
 
 // NewPrometheusObj creates a new Prometheus client with the given configuration.
 func NewPrometheusObj(
 	address string,
-	queryNginxAvailable, queryBastionSSHAvailable, queryNginxData, queryBastionSSHData string,
+	queryNginxAvailable, queryBastionSSHAvailable, queryWebSSHAvailable, queryNginxData, queryBastionSSHData, queryWebSSHData string,
 ) (PrometheusClientInterface, error) {
 	client, err := api.NewClient(api.Config{
 		Address: address,
@@ -56,8 +58,10 @@ func NewPrometheusObj(
 		address:                  address,
 		queryNginxAvailable:      queryNginxAvailable,
 		queryBastionSSHAvailable: queryBastionSSHAvailable,
+		queryWebSSHAvailable:     queryWebSSHAvailable,
 		queryNginxData:           queryNginxData,
 		queryBastionSSHData:      queryBastionSSHData,
+		queryWebSSHData:          queryWebSSHData,
 		client:                   v1api,
 	}, nil
 }
@@ -83,18 +87,22 @@ func (p *Prometheus) IsPrometheusHealthy(ctx context.Context, timeout time.Durat
 	// Check if ingress metrics and bastion metrics are available on worker nodes
 	query1 := p.queryNginxAvailable
 	query2 := p.queryBastionSSHAvailable
+	query3 := p.queryWebSSHAvailable
 
 	result1, _, err1 := p.client.Query(ctx, query1, time.Now())
 	result2, _, err2 := p.client.Query(ctx, query2, time.Now())
+	result3, _, err3 := p.client.Query(ctx, query3, time.Now())
 
-	if err1 != nil && err2 != nil {
+	if err1 != nil && err2 != nil && err3 != nil {
 		log.Error(err1, "Failed to query Prometheus for ingress metrics")
 		log.Error(err2, "Failed to query Prometheus for bastion SSH metrics")
-		return false, fmt.Errorf("both Prometheus queries failed: %w, %w", err1, err2)
+		log.Error(err3, "Failed to query Prometheus for web SSH metrics")
+		return false, fmt.Errorf("all Prometheus queries failed: %w, %w, %w", err1, err2, err3)
 	}
 
 	active1 := false
 	active2 := false
+	active3 := false
 
 	if err1 == nil {
 		vec1, ok1 := result1.(model.Vector)
@@ -108,13 +116,19 @@ func (p *Prometheus) IsPrometheusHealthy(ctx context.Context, timeout time.Durat
 			active2 = true
 		}
 	}
+	if err3 == nil {
+		vec3, ok3 := result3.(model.Vector)
+		if ok3 && len(vec3) > 0 && int(vec3[0].Value) > 0 {
+			active3 = true
+		}
+	}
 
-	if !active1 && !active2 {
-		log.Error(fmt.Errorf("neither ingress metrics nor bastion SSH metrics are available on worker nodes"), "Neither ingress metrics nor bastion SSH metrics are available on worker nodes")
+	if !active1 && !active2 && !active3 {
+		log.Error(fmt.Errorf("no metrics are available on worker nodes"), "No metrics are available on worker nodes")
 		return false, nil
 	}
 
-	// At least one node has ingress metrics available
+	// At least one node has metrics available
 	return true, nil
 }
 
@@ -166,6 +180,7 @@ type PrometheusClientInterface interface {
 	GetLastActivityTime(query string, interval time.Duration) (time.Time, error)
 	GetQueryNginxData() string
 	GetQuerySSHData() string
+	GetQueryWebSSHData() string
 }
 
 // GetQueryNginxData returns the query string for Nginx data.
@@ -176,4 +191,9 @@ func (p *Prometheus) GetQueryNginxData() string {
 // GetQuerySSHData returns the query string for SSH data.
 func (p *Prometheus) GetQuerySSHData() string {
 	return p.queryBastionSSHData
+}
+
+// GetQueryWebSSHData returns the query string for WebSSH data.
+func (p *Prometheus) GetQueryWebSSHData() string {
+	return p.queryWebSSHData
 }

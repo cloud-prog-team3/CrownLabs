@@ -254,21 +254,26 @@ func (r *InstanceInactiveTerminationReconciler) UpdateInstanceLastLogin(ctx cont
 	querySSH := fmt.Sprintf(r.Prometheus.GetQuerySSHData(), instance.Status.IP)
 	lastActivityTimeSSH, errSSH := r.Prometheus.GetLastActivityTime(querySSH, inactivityTimeoutDuration)
 
-	if errNginx != nil && errSSH != nil {
-		return fmt.Errorf("failed retrieving last activity time from both Nginx and SSH queries: %w", errNginx)
+	queryWebSSH := fmt.Sprintf(r.Prometheus.GetQueryWebSSHData(), instance.Namespace, instance.Name)
+	lastActivityTimeWebSSH, errWebSSH := r.Prometheus.GetLastActivityTime(queryWebSSH, inactivityTimeoutDuration)
+
+	if errNginx != nil && errSSH != nil && errWebSSH != nil {
+		return fmt.Errorf("failed retrieving last activity time from all queries: %w", errNginx)
 	}
-	if lastActivityTimeNginx.IsZero() && lastActivityTimeSSH.IsZero() {
+	if lastActivityTimeNginx.IsZero() && lastActivityTimeSSH.IsZero() && lastActivityTimeWebSSH.IsZero() {
 		log.Info("No activity detected for the instance", "instance", instance.Name, "namespace", instance.Namespace)
 		return nil // No activity detected, do not update the last activity time
 	}
 
 	var newLastActivityTime time.Time
 
-	// Take the most recent activity time between Nginx and SSH
-	if lastActivityTimeNginx.After(lastActivityTimeSSH) {
-		newLastActivityTime = lastActivityTimeNginx
-	} else {
+	// Take the most recent activity time among Nginx, SSH, and WebSSH
+	newLastActivityTime = lastActivityTimeNginx
+	if lastActivityTimeSSH.After(newLastActivityTime) {
 		newLastActivityTime = lastActivityTimeSSH
+	}
+	if lastActivityTimeWebSSH.After(newLastActivityTime) {
+		newLastActivityTime = lastActivityTimeWebSSH
 	}
 
 	// Save the current instance in order to be able to patch it later
