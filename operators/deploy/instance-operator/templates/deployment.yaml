@@ -133,8 +133,10 @@ spec:
             - --monitoring-prometheus-url={{ .Values.configurations.monitoring.prometheusURL }}
             - --monitoring-nginx-availability={{ .Values.configurations.monitoring.queryNginxAvailable }}
             - --monitoring-bastion-ssh-availability={{ .Values.configurations.monitoring.queryBastionSSHAvailable }}
+            - --monitoring-web-ssh-availability={{ .Values.configurations.monitoring.queryWebSSHAvailable }}
             - --monitoring-nginx-data={{ .Values.configurations.monitoring.queryNginxData  }}
             - --monitoring-bastion-ssh-data={{ .Values.configurations.monitoring.queryBastionSSHData}}
+            - --monitoring-web-ssh-data={{ .Values.configurations.monitoring.queryWebSSHData}}
             - --max-concurrent-reconciles-termination={{ .Values.configurations.automation.maxConcurrentTerminationReconciles }}
             - --max-concurrent-reconciles-inactive-termination={{ .Values.configurations.automation.maxConcurrentInactiveTerminationReconciles }}
             - --max-concurrent-reconciles-submission={{ .Values.configurations.automation.maxConcurrentSubmissionReconciles }}
