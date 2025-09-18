@@ -37,6 +37,7 @@ type Prometheus struct {
 	queryNginxData           string
 	queryBastionSSHData      string
 	queryWebSSHData          string
+	queryStep                time.Duration
 	client                   v1.API
 }
 
@@ -44,6 +45,7 @@ type Prometheus struct {
 func NewPrometheusObj(
 	address string,
 	queryNginxAvailable, queryBastionSSHAvailable, queryWebSSHAvailable, queryNginxData, queryBastionSSHData, queryWebSSHData string,
+	queryStep time.Duration,
 ) (PrometheusClientInterface, error) {
 	client, err := api.NewClient(api.Config{
 		Address: address,
@@ -62,6 +64,7 @@ func NewPrometheusObj(
 		queryNginxData:           queryNginxData,
 		queryBastionSSHData:      queryBastionSSHData,
 		queryWebSSHData:          queryWebSSHData,
+		queryStep:                queryStep,
 		client:                   v1api,
 	}, nil
 }
@@ -140,7 +143,7 @@ func (p *Prometheus) GetLastActivityTime(query string, interval time.Duration) (
 	r := v1.Range{
 		Start: start,
 		End:   end,
-		Step:  5 * time.Minute,
+		Step:  p.queryStep,
 	}
 
 	result, _, err := p.client.QueryRange(context.Background(), query, r)

@@ -84,6 +84,20 @@ func (mr *MockPrometheusClientInterfaceMockRecorder) GetQuerySSHData() *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetQuerySSHData", reflect.TypeOf((*MockPrometheusClientInterface)(nil).GetQuerySSHData))
 }
 
+// GetQueryWebSSHData mocks base method.
+func (m *MockPrometheusClientInterface) GetQueryWebSSHData() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetQueryWebSSHData")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetQueryWebSSHData indicates an expected call of GetQueryWebSSHData.
+func (mr *MockPrometheusClientInterfaceMockRecorder) GetQueryWebSSHData() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetQueryWebSSHData", reflect.TypeOf((*MockPrometheusClientInterface)(nil).GetQueryWebSSHData))
+}
+
 // IsPrometheusHealthy mocks base method.
 func (m *MockPrometheusClientInterface) IsPrometheusHealthy(ctx context.Context, timeout time.Duration) (bool, error) {
 	m.ctrl.T.Helper()

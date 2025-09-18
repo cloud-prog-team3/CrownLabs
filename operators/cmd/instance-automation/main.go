@@ -76,8 +76,11 @@ func main() {
 	prometheusURL := flag.String("monitoring-prometheus-url", "http://kube-prometheus-stack-prometheus.monitoring:9090", "The URL of the Prometheus instance to use for the Inactive Termination")
 	prometheusNginxAvailability := flag.String("monitoring-nginx-availability", `count(up{service="ingress-nginx-external-controller-metrics"})`, "Prometheus Query to understand if Nginx Metrics are available in Prometheus.")
 	prometheusBastionSSHAvailability := flag.String("monitoring-bastion-ssh-availability", `count(up{container="bastion-operator-tracker-sidecar"})`, "Prometheus Query to understand if SSH (custom metric) Metrics are available in Prometheus.")
+	prometheusWebSSHAvailability := flag.String("monitoring-web-ssh-availability", `count(up{container="webssh"})`, "Prometheus Query to understand if WebSSH (custom metric) Metrics are available in Prometheus.")
 	prometheusNginxData := flag.String("monitoring-nginx-data", `nginx_ingress_controller_requests{exported_namespace=%q, exported_service=%q}`, "Prometheus Query to retrieve metrics about the last (frontend) access to a specific instance.")
 	prometheusBastionSSHData := flag.String("monitoring-bastion-ssh-data", `bastion_ssh_connections{destination_ip=%q}`, "Prometheus Query to retrieve metrics about the last (SSH) access to a specific instance.")
+	prometheusWebSSHData := flag.String("monitoring-web-ssh-data", `bastion_web_ssh_connections{destination_ip=%q}`, "Prometheus Query to retrieve metrics about the last (WebSSH) access to a specific instance.")
+	queryStep := flag.Duration("prometheus-query-step", 5*time.Minute, "The step to use when querying range data from Prometheus.")
 
 	instanceTerminationStatusCheckTimeout := flag.Duration("instance-termination-status-check-timeout", 3*time.Second, "The maximum time to wait for the status check for Instances that require it")
 	instanceTerminationStatusCheckInterval := flag.Duration("instance-termination-status-check-interval", 24*time.Hour, "The interval to check the status of Instances that require it")
@@ -130,8 +133,8 @@ func main() {
 	}
 	log.Info("CrownLabs Email client created", "templateDir", *mailTemplateDir)
 
-	prometheus, err := instautoctrl.NewPrometheusObj(*prometheusURL, *prometheusNginxAvailability, *prometheusBastionSSHAvailability,
-		*prometheusNginxData, *prometheusBastionSSHData)
+	prometheus, err := instautoctrl.NewPrometheusObj(*prometheusURL, *prometheusNginxAvailability, *prometheusBastionSSHAvailability, *prometheusWebSSHAvailability,
+		*prometheusNginxData, *prometheusBastionSSHData, *prometheusWebSSHData, *queryStep)
 	if err != nil {
 		log.Error(err, "unable to create Prometheus client")
 		os.Exit(1)

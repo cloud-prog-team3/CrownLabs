@@ -265,50 +265,28 @@ func (r *InstanceInactiveTerminationReconciler) UpdateInstanceLastLogin(ctx cont
 		return nil // No activity detected, do not update the last activity time
 	}
 
-	var newLastActivityTime time.Time
-
-	// Take the most recent activity time among Nginx, SSH, and WebSSH
-	newLastActivityTime = lastActivityTimeNginx
-	if lastActivityTimeSSH.After(newLastActivityTime) {
-		newLastActivityTime = lastActivityTimeSSH
+	var maxLastActivityTime time.Time
+	maxLastActivityTime = lastActivityTimeNginx
+	if lastActivityTimeSSH.After(maxLastActivityTime) {
+		maxLastActivityTime = lastActivityTimeSSH
 	}
-	if lastActivityTimeWebSSH.After(newLastActivityTime) {
-		newLastActivityTime = lastActivityTimeWebSSH
+	if lastActivityTimeWebSSH.After(maxLastActivityTime) {
+		maxLastActivityTime = lastActivityTimeWebSSH
 	}
 
-	// Save the current instance in order to be able to patch it later
-	originalInstance := instance.DeepCopy()
-
+	// patch the instance with the new last activity time
+	patch := client.MergeFrom(instance.DeepCopy())
 	if instance.Annotations == nil {
 		instance.Annotations = make(map[string]string)
 	}
-
-	// Compare with the previously stored last activity to detect new activity
-	var prevLastActivity time.Time
-	if instance.Annotations[forge.LastActivityAnnotation] != "" {
-		if prevLastActivityTime, err := time.Parse(time.RFC3339, instance.Annotations[forge.LastActivityAnnotation]); err == nil {
-			prevLastActivity = prevLastActivityTime
-		} else {
-			log.Error(err, "failed parsing previous last activity timestamp; treating as zero time", "value", instance.Annotations[forge.LastActivityAnnotation], "instance", instance.Name, "namespace", instance.Namespace)
-			prevLastActivity = time.Time{}
-		}
-	} else {
-		log.Info("previous last activity annotation not found; treating as zero time", "instance", instance.Name, "namespace", instance.Namespace)
-		prevLastActivity = time.Time{}
-	}
-
-	// If a new activity is detected, update the annotations.
-	if newLastActivityTime.After(prevLastActivity) {
-		instance.Annotations[forge.LastActivityAnnotation] = newLastActivityTime.Format(time.RFC3339)
-		instance.Annotations[forge.AlertAnnotationNum] = "0"
-	}
-
-	// finally patch the instance with the new annotations
-	if err := r.Patch(ctx, instance, client.MergeFrom(originalInstance)); err != nil {
+	instance.Annotations[forge.LastActivityAnnotation] = maxLastActivityTime.Format(time.RFC3339)
+	instance.Annotations[forge.AlertAnnotationNum] = "0"
+	if err := r.Patch(ctx, instance, patch); err != nil {
 		return err
 	}
 
 	return nil
+
 }
 
 // GetRemainingInactivityTime checks if the Instance has to be terminated.
