@@ -287,6 +287,11 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 			Return("").
 			AnyTimes()
 
+		mockProm.EXPECT().
+			GetQueryWebSSHData().
+			Return("").
+			AnyTimes()
+
 		newNs := workingNs.DeepCopy()
 		tenNs := tenantNs.DeepCopy()
 		newPersistentTemplate := persistentTemplate.DeepCopy()
@@ -392,6 +397,11 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 				Return("").
 				AnyTimes()
 
+			mockProm.EXPECT().
+				GetQueryWebSSHData().
+				Return("").
+				AnyTimes()
+
 			By("Getting current instance")
 			currentInstance := &crownlabsv1alpha2.Instance{}
 			instanceLookupKey := types.NamespacedName{Name: PersistentInstanceName, Namespace: tenant.Namespace}
@@ -437,6 +447,11 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 				Return("").
 				AnyTimes()
 
+			mockProm.EXPECT().
+				GetQueryWebSSHData().
+				Return("").
+				AnyTimes()
+
 			By("Getting current instance")
 			currentInstance := &crownlabsv1alpha2.Instance{}
 			instanceLookupKey := types.NamespacedName{Name: NonPersistentInstanceName, Namespace: tenant.Namespace}
@@ -473,6 +488,11 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 				Return("").
 				AnyTimes()
 
+			mockProm.EXPECT().
+				GetQueryWebSSHData().
+				Return("").
+				AnyTimes()
+
 			By("Getting current instance")
 			currentInstance := &crownlabsv1alpha2.Instance{}
 			instanceLookupKey := types.NamespacedName{Name: NonPersistentInstanceName, Namespace: tenant.Namespace}
@@ -499,6 +519,11 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 
 			mockProm.EXPECT().
 				GetQuerySSHData().
+				Return("").
+				AnyTimes()
+
+			mockProm.EXPECT().
+				GetQueryWebSSHData().
 				Return("").
 				AnyTimes()
 
@@ -537,6 +562,11 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 			mockProm.EXPECT().
 				GetLastActivityTime(gomock.Any(), gomock.Any()).
 				Return(time.Now(), nil).
+				AnyTimes()
+
+			mockProm.EXPECT().
+				GetQueryWebSSHData().
+				Return("").
 				AnyTimes()
 
 			By("Getting current instance")
@@ -580,6 +610,11 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 				Return(time.Now().Add(-100*time.Hour), nil).
 				AnyTimes()
 
+			mockProm.EXPECT().
+				GetQueryWebSSHData().
+				Return("").
+				AnyTimes()
+
 			By("Getting current instance")
 			currentInstance := &crownlabsv1alpha2.Instance{}
 			instanceLookupKey := types.NamespacedName{Name: PersistentInstanceName, Namespace: tenant.Namespace}
@@ -613,6 +648,11 @@ var _ = Describe("Instautoctrl-inactivity", func() {
 
 			mockProm.EXPECT().
 				GetQuerySSHData().
+				Return("").
+				AnyTimes()
+
+			mockProm.EXPECT().
+				GetQueryWebSSHData().
 				Return("").
 				AnyTimes()
 

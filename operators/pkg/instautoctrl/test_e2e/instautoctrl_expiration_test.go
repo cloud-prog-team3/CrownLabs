@@ -200,6 +200,11 @@ var _ = Describe("Instautoctrl-expiration", func() {
 			GetQuerySSHData().
 			Return("").
 			AnyTimes()
+
+		mockProm.EXPECT().
+			GetQueryWebSSHData().
+			Return("").
+			AnyTimes()
 		newNs := workingNs.DeepCopy()
 		newPersistentTemplate := persistentTemplate.DeepCopy()
 		newNonPersistentTemplate := nonPersistentTemplate.DeepCopy()

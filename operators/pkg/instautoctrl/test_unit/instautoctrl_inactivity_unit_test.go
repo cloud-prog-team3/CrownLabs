@@ -309,6 +309,11 @@ var _ = Describe("Instautoctrl inactivity unit test", func() {
 			Return("").
 			AnyTimes()
 
+		mockProm.EXPECT().
+			GetQueryWebSSHData().
+			Return("").
+			AnyTimes()
+
 		newNs := workingNs.DeepCopy()
 		tenNs := tenantNs.DeepCopy()
 		newPersistentTemplate := persistentTemplate.DeepCopy()
